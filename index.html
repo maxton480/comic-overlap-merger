@@ -2,55 +2,75 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Comic Batch Merge Pro</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comic Merge Pro</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <style>
+*{box-sizing:border-box;margin:0;padding:0}
+
 body{
-  margin:0;
-  font-family:system-ui;
-  background:#0b1020;
-  color:white;
-  display:flex;
-  justify-content:center;
+font-family:system-ui;
+background:linear-gradient(180deg,#0b1020,#111827);
+color:white;
+display:flex;
+justify-content:center;
 }
 
 .container{
-  width:95%;
-  max-width:480px;
-  padding:20px;
+width:95%;
+max-width:480px;
+padding:20px;
 }
 
-h1{text-align:center;margin-bottom:8px}
-.sub{text-align:center;opacity:.7;margin-bottom:15px}
+.card{
+background:#151a2b;
+border-radius:18px;
+padding:20px;
+box-shadow:0 10px 30px rgba(0,0,0,.5);
+}
+
+h1{text-align:center;margin-bottom:6px}
+.sub{text-align:center;opacity:.7;font-size:14px;margin-bottom:15px}
 
 input,button{
-  width:100%;
-  margin-top:10px;
+width:100%;
+margin-top:10px;
+border:none;
+border-radius:10px;
+padding:12px;
+font-size:15px;
 }
 
 button{
-  padding:14px;
-  border:none;
-  border-radius:12px;
-  background:linear-gradient(90deg,#22c55e,#16a34a);
-  color:white;
-  font-size:16px;
+background:linear-gradient(90deg,#22c55e,#16a34a);
+color:white;
+font-weight:bold;
 }
 
 .progress{
-  margin-top:15px;
-  height:8px;
-  background:#222;
-  border-radius:10px;
-  overflow:hidden;
+margin-top:15px;
+height:8px;
+background:#222;
+border-radius:10px;
+overflow:hidden;
 }
 
 .bar{
-  height:100%;
-  width:0%;
-  background:#4ade80;
+height:100%;
+width:0%;
+background:#4ade80;
+transition:.25s;
 }
+
+.small{
+opacity:.6;
+font-size:12px;
+text-align:center;
+margin-top:6px;
+}
+
 canvas{display:none}
 </style>
 </head>
@@ -58,128 +78,128 @@ canvas{display:none}
 <body>
 
 <div class="container">
+<div class="card">
 
-<h1>📖 Comic Batch Merge</h1>
-<p class="sub">Auto merge • Watermark • WebP export</p>
+<h1>📖 Comic Merge Pro</h1>
+<p class="sub">Batch Merge • Watermark • ZIP Export</p>
 
 <input type="file" id="images" multiple accept="image/*">
 
-<label>Watermark Image (PNG)</label>
-<input type="file" id="watermark" accept="image/png">
+<input id="zipname" placeholder="ZIP name (example: chapter_01)">
 
 <button onclick="start()">Merge & Download</button>
 
 <div class="progress"><div class="bar" id="bar"></div></div>
 
+<p class="small">watermark.png auto loaded from repo</p>
+
 <canvas id="canvas"></canvas>
 
+</div>
 </div>
 
 <script>
 
 const OVERLAP = 250;
-const BATCH_SIZE = 10;
-const WATERMARK_OPACITY = 0.4;
+const EXPORT_EVERY = 10;
+const WM_OPACITY = 0.4;
 
-function loadImage(file){
-  return new Promise(res=>{
-    const img=new Image();
-    img.onload=()=>res(img);
-    img.src=URL.createObjectURL(file);
-  });
+function loadImage(src){
+return new Promise((res,rej)=>{
+let img=new Image();
+img.crossOrigin="anonymous";
+img.onload=()=>res(img);
+img.onerror=rej;
+img.src=src;
+});
 }
-
-function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
 async function start(){
 
 const files=[...document.getElementById("images").files];
-const wmFile=document.getElementById("watermark").files[0];
+if(!files.length)return alert("Select images");
+
+const zipName=document.getElementById("zipname").value || "chapter";
 const bar=document.getElementById("bar");
 
-if(!files.length) return alert("Select images");
-
-const watermark = wmFile ? await loadImage(wmFile) : null;
-
-let batchCount=Math.ceil(files.length/BATCH_SIZE);
-
-for(let b=0;b<batchCount;b++){
-
-  const batchFiles=files.slice(
-    b*BATCH_SIZE,
-    (b+1)*BATCH_SIZE
-  );
-
-  const images=[];
-
-  for(let f of batchFiles){
-    images.push(await loadImage(f));
-  }
-
-  const width=images[0].width;
-
-  let totalHeight=images[0].height;
-
-  for(let i=1;i<images.length;i++)
-    totalHeight+=images[i].height-OVERLAP;
-
-  const canvas=document.getElementById("canvas");
-  const ctx=canvas.getContext("2d");
-
-  canvas.width=width;
-  canvas.height=totalHeight;
-
-  let y=0;
-
-  ctx.drawImage(images[0],0,y);
-  y+=images[0].height;
-
-  for(let i=1;i<images.length;i++){
-    ctx.drawImage(
-      images[i],
-      0,OVERLAP,
-      width,images[i].height-OVERLAP,
-      0,y,
-      width,images[i].height-OVERLAP
-    );
-    y+=images[i].height-OVERLAP;
-  }
-
-  // WATERMARK
-  if(watermark){
-    ctx.globalAlpha=WATERMARK_OPACITY;
-
-    const wmWidth=width*0.6;
-    const wmHeight=watermark.height*(wmWidth/watermark.width);
-
-    ctx.drawImage(
-      watermark,
-      (width-wmWidth)/2,
-      canvas.height-wmHeight-40,
-      wmWidth,
-      wmHeight
-    );
-
-    ctx.globalAlpha=1;
-  }
-
-  // EXPORT WEBP
-  const url=canvas.toDataURL("image/webp",0.95);
-
-  const a=document.createElement("a");
-
-  const number=String(b+1).padStart(3,"0");
-
-  a.href=url;
-  a.download=`${number}.webp`;
-  a.click();
-
-  bar.style.width=((b+1)/batchCount*100)+"%";
-
-  await sleep(500); // mobile safety delay
+let watermark=null;
+try{
+watermark=await loadImage("watermark.png");
+}catch(e){
+console.log("No watermark found");
 }
 
-alert("✅ All batches downloaded!");
+const zip=new JSZip();
+
+const images=[];
+for(let f of files)
+images.push(await loadImage(URL.createObjectURL(f)));
+
+const width=images[0].width;
+let batchIndex=0;
+
+for(let i=0;i<images.length;i+=EXPORT_EVERY){
+
+const batch=images.slice(i,i+EXPORT_EVERY);
+
+let totalHeight=batch[0].height;
+for(let j=1;j<batch.length;j++)
+totalHeight+=batch[j].height-OVERLAP;
+
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+
+canvas.width=width;
+canvas.height=totalHeight;
+
+let y=0;
+
+ctx.drawImage(batch[0],0,y);
+y+=batch[0].height;
+
+for(let j=1;j<batch.length;j++){
+ctx.drawImage(
+batch[j],
+0,OVERLAP,
+width,batch[j].height-OVERLAP,
+0,y,
+width,batch[j].height-OVERLAP
+);
+y+=batch[j].height-OVERLAP;
+}
+
+// watermark bottom-right
+if(watermark){
+ctx.globalAlpha=WM_OPACITY;
+
+let wmWidth=width*0.18;
+let wmHeight=watermark.height*(wmWidth/watermark.width);
+
+ctx.drawImage(
+watermark,
+width-wmWidth-20,
+canvas.height-wmHeight-20,
+wmWidth,
+wmHeight
+);
+
+ctx.globalAlpha=1;
+}
+
+let blob=await new Promise(r=>canvas.toBlob(r,"image/webp",0.95));
+
+let name=String(++batchIndex).padStart(3,"0")+".webp";
+zip.file(name,blob);
+
+bar.style.width=Math.min(((i+EXPORT_EVERY)/images.length)*100,100)+"%";
+}
+
+zip.generateAsync({type:"blob"}).then(content=>{
+let a=document.createElement("a");
+a.href=URL.createObjectURL(content);
+a.download=zipName+".zip";
+a.click();
+});
 
 }
 
