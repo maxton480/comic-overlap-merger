@@ -1,39 +1,80 @@
-const mergeBtn=document.getElementById("mergeBtn");
-mergeBtn.onclick=mergeImages;
+const mergeBtn = document.getElementById("mergeBtn");
+mergeBtn.onclick = mergeImages;
 
 async function loadImage(file){
   return new Promise(resolve=>{
-    const img=new Image();
-    img.onload=()=>resolve(img);
-    img.src=URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>resolve(img);
+    img.src = URL.createObjectURL(file);
   });
 }
 
-function findOverlap(img1,img2,ctx){
-  let max=250;
-  let overlap=0;
+/* -------- SMART OVERLAP DETECTOR -------- */
 
-  for(let h=30;h<=max;h+=10){
+function getRowData(ctx,y,width){
+  return ctx.getImageData(0,y,width,1).data;
+}
 
-    let d1=ctx.getImageData(
-      0,img1.height-h,img1.width,h
-    ).data;
+function rowDifference(a,b){
+  let diff = 0;
+  for(let i=0;i<a.length;i+=16){
+    diff += Math.abs(a[i]-b[i]);
+  }
+  return diff;
+}
 
-    let d2=ctx.getImageData(
-      0,0,img2.width,h
-    ).data;
+function detectOverlap(img1,img2){
 
-    let diff=0;
+  const c1=document.createElement("canvas");
+  const c2=document.createElement("canvas");
 
-    for(let i=0;i<d1.length;i+=50){
-      diff+=Math.abs(d1[i]-d2[i]);
+  c1.width=img1.width;
+  c1.height=img1.height;
+
+  c2.width=img2.width;
+  c2.height=img2.height;
+
+  const ctx1=c1.getContext("2d");
+  const ctx2=c2.getContext("2d");
+
+  ctx1.drawImage(img1,0,0);
+  ctx2.drawImage(img2,0,0);
+
+  const maxCheck = Math.min(400,img1.height,img2.height);
+
+  let bestOverlap = 0;
+  let bestScore = Infinity;
+
+  // try many overlap heights
+  for(let overlap=40; overlap<=maxCheck; overlap+=4){
+
+    let score=0;
+    let samples=8;
+
+    for(let s=0;s<samples;s++){
+
+      let y1 = img1.height-overlap + Math.floor(s*(overlap/samples));
+      let y2 = Math.floor(s*(overlap/samples));
+
+      let row1=getRowData(ctx1,y1,img1.width);
+      let row2=getRowData(ctx2,y2,img2.width);
+
+      score += rowDifference(row1,row2);
     }
 
-    if(diff<40000) overlap=h;
+    if(score < bestScore){
+      bestScore = score;
+      bestOverlap = overlap;
+    }
   }
 
-  return overlap;
+  // safety threshold
+  if(bestScore > 200000) return 0;
+
+  return bestOverlap;
 }
+
+/* -------- MERGE ENGINE -------- */
 
 async function mergeImages(){
 
@@ -45,27 +86,22 @@ async function mergeImages(){
 
   for(let i=0;i<files.length;i++){
     imgs.push(await loadImage(files[i]));
-    bar.style.width=(i/files.length*25)+"%";
+    bar.style.width=(i/files.length*20)+"%";
   }
-
-  const temp=document.createElement("canvas");
-  const tctx=temp.getContext("2d");
 
   let overlaps=[0];
   let totalHeight=imgs[0].height;
 
   for(let i=1;i<imgs.length;i++){
 
-    temp.width=imgs[i-1].width;
-    temp.height=imgs[i-1].height;
-    tctx.drawImage(imgs[i-1],0,0);
+    const overlap = detectOverlap(imgs[i-1],imgs[i]);
 
-    const overlap=findOverlap(imgs[i-1],imgs[i],tctx);
+    console.log("Overlap found:",overlap);
 
     overlaps.push(overlap);
-    totalHeight+=imgs[i].height-overlap;
+    totalHeight += imgs[i].height - overlap;
 
-    bar.style.width=(25+(i/imgs.length*35))+"%";
+    bar.style.width=(20+(i/imgs.length*30))+"%";
   }
 
   const canvas=document.getElementById("canvas");
@@ -78,7 +114,7 @@ async function mergeImages(){
 
   for(let i=0;i<imgs.length;i++){
 
-    const cut=overlaps[i];
+    const cut = overlaps[i];
 
     ctx.drawImage(
       imgs[i],
@@ -90,9 +126,9 @@ async function mergeImages(){
       imgs[i].height-cut
     );
 
-    y+=imgs[i].height-cut;
+    y += imgs[i].height-cut;
 
-    bar.style.width=(60+(i/imgs.length*40))+"%";
+    bar.style.width=(50+(i/imgs.length*40))+"%";
   }
 
   canvas.toBlob(blob=>{
