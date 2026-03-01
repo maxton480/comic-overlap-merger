@@ -3,97 +3,55 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Comic Merge Pro</title>
+<title>Comic Batch Merge Pro</title>
 
 <style>
-
-*{box-sizing:border-box;margin:0;padding:0}
-
 body{
-  font-family:system-ui,-apple-system;
-  background:linear-gradient(180deg,#0b0f1a,#111827);
+  margin:0;
+  font-family:system-ui;
+  background:#0b1020;
   color:white;
-  min-height:100vh;
   display:flex;
-  align-items:center;
   justify-content:center;
 }
 
 .container{
   width:95%;
   max-width:480px;
-  background:#151a2b;
-  border-radius:18px;
-  padding:22px;
-  box-shadow:0 10px 30px rgba(0,0,0,.5);
+  padding:20px;
 }
 
-h1{
-  font-size:22px;
-  text-align:center;
-  margin-bottom:10px;
-}
+h1{text-align:center;margin-bottom:8px}
+.sub{text-align:center;opacity:.7;margin-bottom:15px}
 
-.sub{
-  text-align:center;
-  opacity:.7;
-  font-size:14px;
-  margin-bottom:18px;
-}
-
-.upload{
-  border:2px dashed #2f3b63;
-  padding:25px;
-  border-radius:12px;
-  text-align:center;
-  margin-bottom:15px;
-}
-
-input[type=file]{
+input,button{
   width:100%;
+  margin-top:10px;
 }
 
 button{
-  width:100%;
   padding:14px;
   border:none;
   border-radius:12px;
   background:linear-gradient(90deg,#22c55e,#16a34a);
   color:white;
   font-size:16px;
-  font-weight:bold;
-}
-
-button:active{
-  transform:scale(.97);
 }
 
 .progress{
   margin-top:15px;
   height:8px;
   background:#222;
-  border-radius:20px;
+  border-radius:10px;
   overflow:hidden;
 }
 
 .bar{
   height:100%;
   width:0%;
-  background:linear-gradient(90deg,#22c55e,#4ade80);
-  transition:.2s;
+  background:#4ade80;
 }
-
-#download{
-  display:block;
-  text-align:center;
-  margin-top:18px;
-  font-size:17px;
-  color:#4ade80;
-  text-decoration:none;
-}
-
-canvas{display:none;}
-
+canvas{display:none}
 </style>
 </head>
 
@@ -101,20 +59,17 @@ canvas{display:none;}
 
 <div class="container">
 
-<h1>📖 Comic Merge Pro</h1>
-<p class="sub">Auto removes repeated panels</p>
+<h1>📖 Comic Batch Merge</h1>
+<p class="sub">Auto merge • Watermark • WebP export</p>
 
-<div class="upload">
 <input type="file" id="images" multiple accept="image/*">
-</div>
 
-<button onclick="merge()">Merge Comic</button>
+<label>Watermark Image (PNG)</label>
+<input type="file" id="watermark" accept="image/png">
 
-<div class="progress">
-<div class="bar" id="bar"></div>
-</div>
+<button onclick="start()">Merge & Download</button>
 
-<a id="download"></a>
+<div class="progress"><div class="bar" id="bar"></div></div>
 
 <canvas id="canvas"></canvas>
 
@@ -122,43 +77,51 @@ canvas{display:none;}
 
 <script>
 
-const OVERLAP = 252; // calibrated overlap
+const OVERLAP = 250;
+const BATCH_SIZE = 10;
+const WATERMARK_OPACITY = 0.4;
 
 function loadImage(file){
-  return new Promise(resolve=>{
+  return new Promise(res=>{
     const img=new Image();
-    img.onload=()=>resolve(img);
+    img.onload=()=>res(img);
     img.src=URL.createObjectURL(file);
   });
 }
 
-async function merge(){
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
-  const files=document.getElementById("images").files;
-  const bar=document.getElementById("bar");
+async function start(){
 
-  if(!files.length){
-    alert("Select images first");
-    return;
-  }
+const files=[...document.getElementById("images").files];
+const wmFile=document.getElementById("watermark").files[0];
+const bar=document.getElementById("bar");
 
-  bar.style.width="0%";
+if(!files.length) return alert("Select images");
+
+const watermark = wmFile ? await loadImage(wmFile) : null;
+
+let batchCount=Math.ceil(files.length/BATCH_SIZE);
+
+for(let b=0;b<batchCount;b++){
+
+  const batchFiles=files.slice(
+    b*BATCH_SIZE,
+    (b+1)*BATCH_SIZE
+  );
 
   const images=[];
 
-  // Load images
-  for(let i=0;i<files.length;i++){
-    images.push(await loadImage(files[i]));
-    bar.style.width=((i+1)/files.length*30)+"%";
+  for(let f of batchFiles){
+    images.push(await loadImage(f));
   }
 
   const width=images[0].width;
 
   let totalHeight=images[0].height;
 
-  for(let i=1;i<images.length;i++){
+  for(let i=1;i<images.length;i++)
     totalHeight+=images[i].height-OVERLAP;
-  }
 
   const canvas=document.getElementById("canvas");
   const ctx=canvas.getContext("2d");
@@ -168,13 +131,10 @@ async function merge(){
 
   let y=0;
 
-  // First image full
   ctx.drawImage(images[0],0,y);
   y+=images[0].height;
 
-  // Next images cropped
   for(let i=1;i<images.length;i++){
-
     ctx.drawImage(
       images[i],
       0,OVERLAP,
@@ -182,19 +142,45 @@ async function merge(){
       0,y,
       width,images[i].height-OVERLAP
     );
-
     y+=images[i].height-OVERLAP;
-
-    bar.style.width=(30+(i/images.length)*70)+"%";
   }
 
-  const link=document.getElementById("download");
+  // WATERMARK
+  if(watermark){
+    ctx.globalAlpha=WATERMARK_OPACITY;
 
-  link.href=canvas.toDataURL("image/png");
-  link.download="merged_comic.png";
-  link.innerText="⬇ Download Merged Comic";
+    const wmWidth=width*0.6;
+    const wmHeight=watermark.height*(wmWidth/watermark.width);
 
-  bar.style.width="100%";
+    ctx.drawImage(
+      watermark,
+      (width-wmWidth)/2,
+      canvas.height-wmHeight-40,
+      wmWidth,
+      wmHeight
+    );
+
+    ctx.globalAlpha=1;
+  }
+
+  // EXPORT WEBP
+  const url=canvas.toDataURL("image/webp",0.95);
+
+  const a=document.createElement("a");
+
+  const number=String(b+1).padStart(3,"0");
+
+  a.href=url;
+  a.download=`${number}.webp`;
+  a.click();
+
+  bar.style.width=((b+1)/batchCount*100)+"%";
+
+  await sleep(500); // mobile safety delay
+}
+
+alert("✅ All batches downloaded!");
+
 }
 
 </script>
