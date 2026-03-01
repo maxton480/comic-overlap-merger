@@ -8,17 +8,25 @@
 
 <body>
 
-<h2>📖 Comic Overlap Remover</h2>
+<div class="app">
 
+<h1>📖 Comic Merger Pro</h1>
+<p class="tag">Remove repeated comic parts easily</p>
+
+<label class="upload">
 <input type="file" id="images" multiple accept="image/*">
+<span>Upload Comic Images</span>
+</label>
 
-<div id="controls"></div>
+<div id="imageList"></div>
 
-<button onclick="merge()">Merge Comic</button>
+<button class="mergeBtn" onclick="merge()">Merge Comic</button>
 
 <canvas id="canvas"></canvas>
 
-<a id="download" download="comic.webp">Download</a>
+<a id="download" download="comic.webp">Download Comic</a>
+
+</div>
 
 <script src="script.js"></script>
 </body>
