@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comic Overlap Merger</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📖 Comic Merger</h1>
+<p class="subtitle">Auto remove repeated comic parts</p>
+
+<label class="uploadBox">
+  <input type="file" id="images" multiple accept="image/*">
+  <span>📂 Select Comic Images</span>
+</label>
+
+<button id="mergeBtn">Merge Comic</button>
+
+<div class="progress">
+  <div id="bar"></div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<a id="downloadBtn" download="comic.webp">⬇ Download Comic</a>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
