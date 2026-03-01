@@ -2,33 +2,158 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Comic Merge Tool</title>
-<link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comic Auto Merge Tool</title>
+
+<style>
+body{
+  margin:0;
+  font-family:system-ui;
+  background:#0f1115;
+  color:white;
+  text-align:center;
+}
+
+.container{
+  padding:20px;
+  max-width:500px;
+  margin:auto;
+}
+
+h1{
+  font-size:22px;
+}
+
+input{
+  margin:15px 0;
+}
+
+button{
+  background:#4CAF50;
+  border:none;
+  padding:14px 20px;
+  border-radius:10px;
+  color:white;
+  font-size:16px;
+  width:100%;
+}
+
+button:active{
+  transform:scale(.97);
+}
+
+.progress{
+  margin-top:15px;
+  width:100%;
+  height:10px;
+  background:#222;
+  border-radius:10px;
+  overflow:hidden;
+}
+
+.bar{
+  height:100%;
+  width:0%;
+  background:#4CAF50;
+}
+
+canvas{
+  display:none;
+}
+</style>
 </head>
 
 <body>
 
 <div class="container">
+<h1>📖 Comic Auto Merge</h1>
 
-<h1>Comic Merge Tool</h1>
-<p class="sub">Remove repeated comic parts easily</p>
+<p>Select comic images (order matters)</p>
 
-<label class="upload">
-<input type="file" id="files" multiple accept="image/*">
-<span>Select Images</span>
-</label>
+<input type="file" id="images" multiple accept="image/*">
 
-<div id="cards"></div>
+<button onclick="mergeImages()">Merge Comic</button>
 
-<button id="mergeBtn">Merge Comic</button>
-
-<canvas id="canvas"></canvas>
-
-<a id="download" download="comic.webp">Download Result</a>
-
+<div class="progress">
+<div class="bar" id="bar"></div>
 </div>
 
-<script src="app.js"></script>
+<br>
+<a id="download"></a>
+
+<canvas id="canvas"></canvas>
+</div>
+
+<script>
+
+const OVERLAP = 251; // 👈 discovered value
+
+function loadImage(file){
+  return new Promise(resolve=>{
+    const img = new Image();
+    img.onload = ()=>resolve(img);
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function mergeImages(){
+
+  const files = document.getElementById("images").files;
+  if(files.length === 0) return alert("Select images first");
+
+  const bar = document.getElementById("bar");
+  bar.style.width="0%";
+
+  const images=[];
+
+  for(let i=0;i<files.length;i++){
+    images.push(await loadImage(files[i]));
+    bar.style.width=((i+1)/files.length*30)+"%";
+  }
+
+  const width = images[0].width;
+
+  let totalHeight = images[0].height;
+
+  for(let i=1;i<images.length;i++){
+    totalHeight += images[i].height - OVERLAP;
+  }
+
+  const canvas=document.getElementById("canvas");
+  const ctx=canvas.getContext("2d");
+
+  canvas.width = width;
+  canvas.height = totalHeight;
+
+  let y=0;
+
+  ctx.drawImage(images[0],0,y);
+  y += images[0].height;
+
+  for(let i=1;i<images.length;i++){
+
+    ctx.drawImage(
+      images[i],
+      0,OVERLAP,
+      width,images[i].height-OVERLAP,
+      0,y,
+      width,images[i].height-OVERLAP
+    );
+
+    y += images[i].height-OVERLAP;
+
+    bar.style.width=(30 + (i/images.length)*70)+"%";
+  }
+
+  const link=document.getElementById("download");
+  link.href=canvas.toDataURL("image/png");
+  link.download="merged_comic.png";
+  link.innerText="⬇ Download Comic";
+
+  bar.style.width="100%";
+}
+
+</script>
+
 </body>
 </html>
