@@ -105,17 +105,23 @@ img.src=WATERMARK;
 });
 }
 
+/* ✅ NEW MERGE LOGIC (BOTTOM CROP + LAST IMAGE SAFE) */
 async function mergeBatch(images, watermark, globalStartIndex){
 
-const width=images[0].width;
+const width = images[0].width;
+const totalImages = images.length;
+const globalLastIndex = globalStartIndex + totalImages - 1;
 
-let totalHeight=0;
+let totalHeight = 0;
 
+/* calculate height */
 images.forEach((img,i)=>{
-if(globalStartIndex+i===0)
-totalHeight+=img.height;
+const globalIndex = globalStartIndex + i;
+
+if(globalIndex === globalLastIndex)
+totalHeight += img.height;
 else
-totalHeight+=img.height-OVERLAP;
+totalHeight += img.height - OVERLAP;
 });
 
 const canvas=document.createElement("canvas");
@@ -130,13 +136,15 @@ images.forEach((img,i)=>{
 
 const globalIndex = globalStartIndex + i;
 
-if(globalIndex===0){
+if(globalIndex === globalLastIndex){
+/* LAST IMAGE untouched */
 ctx.drawImage(img,0,y);
 y+=img.height;
 }else{
+/* REMOVE BOTTOM PART */
 ctx.drawImage(
 img,
-0,OVERLAP,
+0,0,
 width,img.height-OVERLAP,
 0,y,
 width,img.height-OVERLAP
