@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Comic Merger</title>
+<title>Comic Merger Ultimate</title>
 
 <style>
 body{
@@ -60,7 +60,7 @@ background:#22c55e;
 <body>
 
 <div class="wrap">
-<h2>💢 Comic Merger Ultimate</h2>
+<h2>📚 Comic Merger Ultimate</h2>
 
 <div class="card">
 
@@ -82,7 +82,7 @@ background:#22c55e;
 
 <script>
 
-const OVERLAP = 372;
+const OVERLAP = 250;
 const BATCH = 10;
 const WATERMARK = "watermark.png";
 
@@ -105,23 +105,17 @@ img.src=WATERMARK;
 });
 }
 
-/* ✅ NEW MERGE LOGIC (BOTTOM CROP + LAST IMAGE SAFE) */
 async function mergeBatch(images, watermark, globalStartIndex){
 
-const width = images[0].width;
-const totalImages = images.length;
-const globalLastIndex = globalStartIndex + totalImages - 1;
+const width=images[0].width;
 
-let totalHeight = 0;
+let totalHeight=0;
 
-/* calculate height */
 images.forEach((img,i)=>{
-const globalIndex = globalStartIndex + i;
-
-if(globalIndex === globalLastIndex)
-totalHeight += img.height;
+if(globalStartIndex+i===0)
+totalHeight+=img.height;
 else
-totalHeight += img.height - OVERLAP;
+totalHeight+=img.height-OVERLAP;
 });
 
 const canvas=document.createElement("canvas");
@@ -136,15 +130,13 @@ images.forEach((img,i)=>{
 
 const globalIndex = globalStartIndex + i;
 
-if(globalIndex === globalLastIndex){
-/* LAST IMAGE untouched */
+if(globalIndex===0){
 ctx.drawImage(img,0,y);
 y+=img.height;
 }else{
-/* REMOVE BOTTOM PART */
 ctx.drawImage(
 img,
-0,0,
+0,OVERLAP,
 width,img.height-OVERLAP,
 0,y,
 width,img.height-OVERLAP
