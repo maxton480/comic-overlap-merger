@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comic Overlap Stitcher</title>
+
+<style>
+body{
+background:#0f001f;
+color:#e0e0ff;
+font-family:system-ui;
+text-align:center;
+padding:20px;
+}
+
+h1{
+margin-bottom:10px;
+}
+
+input,button{
+margin:10px;
+padding:10px;
+border-radius:10px;
+border:none;
+font-size:16px;
+}
+
+button{
+background:#6c5cff;
+color:white;
+cursor:pointer;
+}
+
+canvas{
+margin-top:20px;
+max-width:100%;
+border:2px solid #333;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Comic Overlap Stitcher</h1>
+
+<input type="file" id="images" multiple accept="image/*"><br>
+
+<label>Overlap Height (px)</label><br>
+<input type="number" id="overlap" value="308"><br>
+
+<button onclick="combine()">Combine Images</button>
+<button onclick="download()">Download WEBP</button>
+
+<br>
+<canvas id="canvas"></canvas>
+
+<script>
+
+let finalCanvas = document.getElementById("canvas");
+let ctx = finalCanvas.getContext("2d");
+
+async function loadImage(file){
+return new Promise((resolve)=>{
+let img = new Image();
+img.onload = ()=>resolve(img);
+img.src = URL.createObjectURL(file);
+});
+}
+
+async function combine(){
+
+let files = document.getElementById("images").files;
+let overlap = parseInt(document.getElementById("overlap").value);
+
+if(files.length==0){
+alert("Upload images first");
+return;
+}
+
+let imgs = [];
+
+for(let file of files){
+imgs.push(await loadImage(file));
+}
+
+let width = imgs[0].width;
+let height = imgs[0].height;
+
+let finalHeight = height + (imgs.length-1)*(height-overlap);
+
+finalCanvas.width = width;
+finalCanvas.height = finalHeight;
+
+let y = 0;
+
+for(let i=0;i<imgs.length;i++){
+
+let img = imgs[i];
+
+if(i==0){
+
+ctx.drawImage(img,0,0);
+
+y += height;
+
+}else{
+
+ctx.drawImage(
+img,
+0, overlap,
+width,
+height-overlap,
+0,
+y-overlap,
+width,
+height-overlap
+);
+
+y += height-overlap;
+
+}
+
+}
+
+}
+
+function download(){
+
+let link=document.createElement("a");
+
+link.download="comic.webp";
+link.href=finalCanvas.toDataURL("image/webp",1);
+
+link.click();
+
+}
+
+</script>
+
+</body>
+</html>
