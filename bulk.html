@@ -77,6 +77,7 @@ background:#22c55e;
 <input type="file" class="folder" webkitdirectory directory>
 
 <input id="zipName" placeholder="ZIP Name (e.g. ipjn)">
+<input id="startNum" type="number" placeholder="Start Number (e.g. 1)" value="1">
 
 <button onclick="start()">🚀 Merge Comic</button>
 
@@ -186,14 +187,15 @@ async function start(){
 const inputs = document.querySelectorAll(".folder");
 const zipBaseName = document.getElementById("zipName").value || "comic";
 
+// 🔥 custom start number
+let folderIndex = parseInt(document.getElementById("startNum").value) || 1;
+
 status.innerText="Loading watermark...";
 let watermark=null;
 
 try{
  watermark=await loadWatermark();
 }catch{}
-
-let folderIndex = 1;
 
 for(const input of inputs){
 
@@ -239,7 +241,7 @@ for(const input of inputs){
  a.download=zipBaseName + folderIndex + ".zip";
  a.click();
 
- folderIndex++;
+ folderIndex++; // 🔥 next number auto
 }
 
 bar.style.width="100%";
