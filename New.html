@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Comic Merger Ultimate</title>
+<title>Comic Merger Pro</title>
 
 <style>
 body{
@@ -26,33 +26,22 @@ border-radius:14px;
 margin-top:15px;
 }
 
-input,button{
+canvas{
 width:100%;
-padding:12px;
-margin-top:10px;
 border-radius:10px;
-border:none;
-font-size:16px;
+margin-top:10px;
+touch-action:none;
 }
 
 button{
+width:100%;
+padding:12px;
+margin-top:10px;
+border:none;
+border-radius:10px;
 background:#22c55e;
 color:white;
-font-weight:bold;
-}
-
-.progress{
-height:10px;
-background:#334155;
-border-radius:10px;
-overflow:hidden;
-margin-top:15px;
-}
-
-.bar{
-height:100%;
-width:0%;
-background:#22c55e;
+font-size:16px;
 }
 </style>
 </head>
@@ -60,25 +49,20 @@ background:#22c55e;
 <body>
 
 <div class="wrap">
-<h2>📚 Comic Merger Ultimate</h2>
+
+<h2>📚 Comic Merger</h2>
 
 <div class="card">
 
 <input type="file" id="files" multiple accept="image/*">
 
-<input id="zipName" placeholder="ZIP Name">
+<p>✂️ Crop First Image</p>
+<canvas id="canvas1"></canvas>
 
-<!-- 🔥 NEW CROPPING INPUTS -->
-<input id="cropTop" type="number" placeholder="First Image Top Crop (px)">
-<input id="cropBottom" type="number" placeholder="Last Image Bottom Crop (px)">
+<p>✂️ Crop Last Image</p>
+<canvas id="canvas2"></canvas>
 
-<button onclick="start()">🚀 Merge Comic</button>
-
-<div class="progress">
-<div id="bar" class="bar"></div>
-</div>
-
-<p id="status">Waiting...</p>
+<button onclick="start()">🚀 Merge</button>
 
 </div>
 </div>
@@ -87,12 +71,32 @@ background:#22c55e;
 
 <script>
 
-const OVERLAP = 250;
-const BATCH = 10;
-const WATERMARK = "watermark.png";
+let files=[];
+let crop1={y1:0,y2:0};
+let crop2={y1:0,y2:0};
 
-const bar=document.getElementById("bar");
-const status=document.getElementById("status");
+const canvas1=document.getElementById("canvas1");
+const canvas2=document.getElementById("canvas2");
+
+let ctx1=canvas1.getContext("2d");
+let ctx2=canvas2.getContext("2d");
+
+document.getElementById("files").onchange=async e=>{
+files=[...e.target.files];
+
+if(files.length<1)return;
+
+// load first
+let img1=await loadImage(files[0]);
+drawImage(canvas1,ctx1,img1);
+
+// load last
+let img2=await loadImage(files[files.length-1]);
+drawImage(canvas2,ctx2,img2);
+
+setupCrop(canvas1,crop1);
+setupCrop(canvas2,crop2);
+};
 
 function loadImage(file){
 return new Promise(r=>{
@@ -102,167 +106,124 @@ img.src=URL.createObjectURL(file);
 });
 }
 
-function loadWatermark(){
-return new Promise(r=>{
-const img=new Image();
-img.onload=()=>r(img);
-img.src=WATERMARK;
-});
+function drawImage(canvas,ctx,img){
+canvas.width=img.width;
+canvas.height=img.height;
+ctx.drawImage(img,0,0);
 }
 
-async function mergeBatch(images, watermark, globalStartIndex, cropTop, cropBottom, totalFiles){
+function setupCrop(canvas,crop){
+
+let dragging=false;
+
+canvas.addEventListener("touchstart",e=>{
+dragging=true;
+crop.y1=e.touches[0].clientY;
+});
+
+canvas.addEventListener("touchmove",e=>{
+if(!dragging)return;
+
+crop.y2=e.touches[0].clientY;
+drawCrop(canvas,crop);
+});
+
+canvas.addEventListener("touchend",()=>{
+dragging=false;
+});
+
+}
+
+function drawCrop(canvas,crop){
+
+const ctx=canvas.getContext("2d");
+
+ctx.fillStyle="rgba(0,0,0,0.5)";
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ctx.clearRect(0,Math.min(crop.y1,crop.y2),canvas.width,Math.abs(crop.y2-crop.y1));
+
+}
+
+async function mergeBatch(images, startIndex){
 
 const width=images[0].width;
 
 let totalHeight=0;
 
 images.forEach((img,i)=>{
-let h = img.height;
+let h=img.height;
 
-// 🔥 FIRST IMAGE TOP CROP
-if(globalStartIndex+i===0){
-h -= cropTop;
+if(startIndex+i===0){
+h = Math.abs(crop1.y2 - crop1.y1);
+}
+if(startIndex+i===files.length-1){
+h = Math.abs(crop2.y2 - crop2.y1);
 }
 
-// 🔥 LAST IMAGE BOTTOM CROP
-if(globalStartIndex+i===totalFiles-1){
-h -= cropBottom;
-}
-
-if(globalStartIndex+i===0)
+if(startIndex+i===0)
 totalHeight+=h;
 else
-totalHeight+=h-OVERLAP;
+totalHeight+=h-200;
 });
 
 const canvas=document.createElement("canvas");
 canvas.width=width;
 canvas.height=totalHeight;
-
 const ctx=canvas.getContext("2d");
 
 let y=0;
 
 images.forEach((img,i)=>{
 
-const globalIndex = globalStartIndex + i;
+let sy=0;
+let sh=img.height;
 
-let sx = 0;
-let sy = 0;
-let sw = width;
-let sh = img.height;
-
-// 🔥 APPLY CROPS
-if(globalIndex===0){
-sy = cropTop;
-sh = img.height - cropTop;
+if(startIndex+i===0){
+sy = Math.min(crop1.y1,crop1.y2);
+sh = Math.abs(crop1.y2-crop1.y1);
 }
 
-if(globalIndex===totalFiles-1){
-sh = img.height - cropBottom;
+if(startIndex+i===files.length-1){
+sy = Math.min(crop2.y1,crop2.y2);
+sh = Math.abs(crop2.y2-crop2.y1);
 }
 
-if(globalIndex===0){
-ctx.drawImage(img, sx, sy, sw, sh, 0, y, sw, sh);
-y += sh;
-}else{
-ctx.drawImage(
-img,
-0,OVERLAP,
-width,sh-OVERLAP,
-0,y,
-width,sh-OVERLAP
-);
-y += sh-OVERLAP;
-}
+ctx.drawImage(img,0,sy,width,sh,0,y,width,sh);
+y+=sh-200;
 
 });
 
-/* watermark */
-if(watermark){
-ctx.globalAlpha=0.4;
-
-const wmW=width*0.25;
-const ratio=watermark.height/watermark.width;
-const wmH=wmW*ratio;
-
-ctx.drawImage(
-watermark,
-width-wmW-20,
-totalHeight-wmH-20,
-wmW,
-wmH
-);
-
-ctx.globalAlpha=1;
-}
-
-return new Promise(res=>{
-canvas.toBlob(res,"image/webp",0.95);
-});
+return new Promise(r=>canvas.toBlob(r,"image/webp",0.95));
 }
 
 async function start(){
 
-const files=[...document.getElementById("files").files];
-if(!files.length)return alert("Select images");
-
-const cropTop = parseInt(document.getElementById("cropTop").value) || 0;
-const cropBottom = parseInt(document.getElementById("cropBottom").value) || 0;
-
-status.innerText="Loading watermark...";
-
-let watermark=null;
-try{
-watermark=await loadWatermark();
-}catch{}
-
 const zip=new JSZip();
-const zipName=document.getElementById("zipName").value||"comic";
 
-let outputIndex=1;
+let index=1;
 
-for(let i=0;i<files.length;i+=BATCH){
+for(let i=0;i<files.length;i+=10){
 
-status.innerText=`Processing ${i+1}-${Math.min(i+BATCH,files.length)}`;
-
-const batchFiles=files.slice(i,i+BATCH);
+const batch=files.slice(i,i+10);
 
 const imgs=[];
-for(const f of batchFiles){
+for(const f of batch){
 imgs.push(await loadImage(f));
 }
 
-const blob=await mergeBatch(
-imgs,
-watermark,
-i,
-cropTop,
-cropBottom,
-files.length
-);
+const blob=await mergeBatch(imgs,i);
 
-const name=String(outputIndex).padStart(3,"0")+".webp";
-zip.file(name,blob);
-
-outputIndex++;
-
-bar.style.width=Math.floor(((i+BATCH)/files.length)*100)+"%";
-
-await new Promise(r=>requestAnimationFrame(r));
+zip.file(index+".webp",blob);
+index++;
 }
-
-status.innerText="Creating ZIP...";
 
 const content=await zip.generateAsync({type:"blob"});
 
 const a=document.createElement("a");
 a.href=URL.createObjectURL(content);
-a.download=zipName+".zip";
+a.download="comic.zip";
 a.click();
-
-bar.style.width="100%";
-status.innerText="✅ Done!";
 }
 
 </script>
