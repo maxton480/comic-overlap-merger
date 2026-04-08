@@ -1,1 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comic Merger Ultimate</title>
 
+<style>
+body{
+margin:0;
+background:#0f172a;
+color:white;
+font-family:sans-serif;
+text-align:center;
+}
+
+.wrap{
+max-width:500px;
+margin:auto;
+padding:15px;
+}
+
+.card{
+background:#1e293b;
+padding:15px;
+border-radius:14px;
+margin-top:15px;
+}
+
+input,button{
+width:100%;
+padding:12px;
+margin-top:10px;
+border-radius:10px;
+border:none;
+font-size:16px;
+}
+
+button{
+background:#22c55e;
+color:white;
+font-weight:bold;
+}
+
+.progress{
+height:10px;
+background:#334155;
+border-radius:10px;
+overflow:hidden;
+margin-top:15px;
+}
+
+.bar{
+height:100%;
+width:0%;
+background:#22c55e;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+<h2>📚 Comic Merger Ultimate</h2>
+
+<div class="card">
+
+<input type="file" id="files" multiple accept="image/*">
+
+<input id="zipName" placeholder="ZIP Name">
+
+<!-- 🔥 NEW CROPPING INPUTS -->
+<input id="cropTop" type="number" placeholder="First Image Top Crop (px)">
+<input id="cropBottom" type="number" placeholder="Last Image Bottom Crop (px)">
+
+<button onclick="start()">🚀 Merge Comic</button>
+
+<div class="progress">
+<div id="bar" class="bar"></div>
+</div>
+
+<p id="status">Waiting...</p>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script>
+
+const OVERLAP = 250;
+const BATCH = 10;
+const WATERMARK = "watermark.png";
+
+const bar=document.getElementById("bar");
+const status=document.getElementById("status");
+
+function loadImage(file){
+return new Promise(r=>{
+const img=new Image();
+img.onload=()=>r(img);
+img.src=URL.createObjectURL(file);
+});
+}
+
+function loadWatermark(){
+return new Promise(r=>{
+const img=new Image();
+img.onload=()=>r(img);
+img.src=WATERMARK;
+});
+}
+
+async function mergeBatch(images, watermark, globalStartIndex, cropTop, cropBottom, totalFiles){
+
+const width=images[0].width;
+
+let totalHeight=0;
+
+images.forEach((img,i)=>{
+let h = img.height;
+
+// 🔥 FIRST IMAGE TOP CROP
+if(globalStartIndex+i===0){
+h -= cropTop;
+}
+
+// 🔥 LAST IMAGE BOTTOM CROP
+if(globalStartIndex+i===totalFiles-1){
+h -= cropBottom;
+}
+
+if(globalStartIndex+i===0)
+totalHeight+=h;
+else
+totalHeight+=h-OVERLAP;
+});
+
+const canvas=document.createElement("canvas");
+canvas.width=width;
+canvas.height=totalHeight;
+
+const ctx=canvas.getContext("2d");
+
+let y=0;
+
+images.forEach((img,i)=>{
+
+const globalIndex = globalStartIndex + i;
+
+let sx = 0;
+let sy = 0;
+let sw = width;
+let sh = img.height;
+
+// 🔥 APPLY CROPS
+if(globalIndex===0){
+sy = cropTop;
+sh = img.height - cropTop;
+}
+
+if(globalIndex===totalFiles-1){
+sh = img.height - cropBottom;
+}
+
+if(globalIndex===0){
+ctx.drawImage(img, sx, sy, sw, sh, 0, y, sw, sh);
+y += sh;
+}else{
+ctx.drawImage(
+img,
+0,OVERLAP,
+width,sh-OVERLAP,
+0,y,
+width,sh-OVERLAP
+);
+y += sh-OVERLAP;
+}
+
+});
+
+/* watermark */
+if(watermark){
+ctx.globalAlpha=0.4;
+
+const wmW=width*0.25;
+const ratio=watermark.height/watermark.width;
+const wmH=wmW*ratio;
+
+ctx.drawImage(
+watermark,
+width-wmW-20,
+totalHeight-wmH-20,
+wmW,
+wmH
+);
+
+ctx.globalAlpha=1;
+}
+
+return new Promise(res=>{
+canvas.toBlob(res,"image/webp",0.95);
+});
+}
+
+async function start(){
+
+const files=[...document.getElementById("files").files];
+if(!files.length)return alert("Select images");
+
+const cropTop = parseInt(document.getElementById("cropTop").value) || 0;
+const cropBottom = parseInt(document.getElementById("cropBottom").value) || 0;
+
+status.innerText="Loading watermark...";
+
+let watermark=null;
+try{
+watermark=await loadWatermark();
+}catch{}
+
+const zip=new JSZip();
+const zipName=document.getElementById("zipName").value||"comic";
+
+let outputIndex=1;
+
+for(let i=0;i<files.length;i+=BATCH){
+
+status.innerText=`Processing ${i+1}-${Math.min(i+BATCH,files.length)}`;
+
+const batchFiles=files.slice(i,i+BATCH);
+
+const imgs=[];
+for(const f of batchFiles){
+imgs.push(await loadImage(f));
+}
+
+const blob=await mergeBatch(
+imgs,
+watermark,
+i,
+cropTop,
+cropBottom,
+files.length
+);
+
+const name=String(outputIndex).padStart(3,"0")+".webp";
+zip.file(name,blob);
+
+outputIndex++;
+
+bar.style.width=Math.floor(((i+BATCH)/files.length)*100)+"%";
+
+await new Promise(r=>requestAnimationFrame(r));
+}
+
+status.innerText="Creating ZIP...";
+
+const content=await zip.generateAsync({type:"blob"});
+
+const a=document.createElement("a");
+a.href=URL.createObjectURL(content);
+a.download=zipName+".zip";
+a.click();
+
+bar.style.width="100%";
+status.innerText="✅ Done!";
+}
+
+</script>
+
+</body>
+</html>
